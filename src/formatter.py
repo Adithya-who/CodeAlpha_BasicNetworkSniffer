@@ -139,3 +139,22 @@ def print_summary_report(stats: CaptureStats) -> None:
             talkers_table.add_row(ip, str(count))
 
         console.print(talkers_table)
+
+    # Security alerts table if any alerts occurred
+    if stats.alerts:
+        alerts_table = Table(title="[!] Security Alerts Detected", border_style="red", header_style="bold red")
+        alerts_table.add_column("Severity", style="bold")
+        alerts_table.add_column("Type", style="yellow")
+        alerts_table.add_column("Source IP", style="bright_cyan")
+        alerts_table.add_column("Description", style="white")
+
+        for alert in stats.alerts:
+            sev_color = "red" if alert["severity"] == "HIGH" else "yellow" if alert["severity"] == "MEDIUM" else "cyan"
+            alerts_table.add_row(
+                f"[{sev_color}]{alert['severity']}[/{sev_color}]",
+                alert["alert_type"],
+                alert["source_ip"],
+                alert["description"]
+            )
+
+        console.print(alerts_table)

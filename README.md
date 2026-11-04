@@ -76,19 +76,26 @@ The capture engine follows a decoupled, resilient pipeline designed to prevent d
 
 ```text
 CodeAlpha_BasicNetworkSniffer/
+├── .github/workflows/
+│   └── tests.yml          # GitHub Actions CI/CD test runner
 ├── src/
 │   ├── __init__.py        # Package initialization
 │   ├── models.py          # PacketRecord dataclass definition
 │   ├── parser.py          # Layer dissection (Ethernet, ARP, IP, TCP, UDP, ICMP, DNS)
+│   ├── heuristics.py      # Heuristic NIDS engine (port scans, credentials, DNS tunnels)
 │   ├── sniffer.py         # Capture lifecycle, PcapWriter, and offline reader
 │   ├── formatter.py       # Rich CLI presentation and protocol color mapping
-│   ├── stats.py           # Capture metrics, throughput, and session statistics
+│   ├── stats.py           # Capture metrics, throughput, JSON export, and session stats
 │   └── utils.py           # Admin privilege checks and interface resolution
+├── scripts/
+│   └── generate_traffic.py# Safe synthetic packet & security vector generator
 ├── tests/
 │   ├── __init__.py
-│   └── test_parser.py     # Unit tests verifying dissectors on synthetic frames
+│   ├── test_parser.py     # Unit tests verifying dissectors on synthetic frames
+│   └── test_heuristics.py # Unit tests verifying anomaly detection logic
 ├── captures/              # Sample capture files (.pcap)
-│   └── sample_demo.pcap
+│   ├── sample_demo.pcap
+│   └── security_demo.pcap
 ├── main.py                # Command-line entry point
 ├── requirements.txt       # Python dependencies
 ├── pytest.ini             # Test runner configuration
@@ -135,6 +142,8 @@ pip install -r requirements.txt
 | `-c` | `--count` | Maximum number of packets to capture before exiting |
 | `-t` | `--timeout` | Capture session timeout in seconds |
 | `-p` | `--protocol` | Application-level display filter (`TCP`, `UDP`, `ICMP`, `DNS`) |
+| | `--detect-anomalies` | Enable heuristic NIDS engine (port scans, cleartext passwords, DNS tunneling) |
+| | `--export-json` | Export session telemetry, protocol distributions, and security alerts to JSON |
 | | `--no-admin-check` | Bypass administrator privilege pre-flight check |
 
 ---
@@ -173,6 +182,18 @@ python main.py -i 1 -f "udp port 53" -w captures/dns_session.pcap
 ### 6. Filter for Web Traffic (HTTP / HTTPS)
 ```powershell
 python main.py -i 1 -f "tcp port 80 or tcp port 443" -c 100
+```
+
+### 7. Real-Time Anomaly Detection & JSON Telemetry Export
+Detect port sweeps, cleartext passwords, and DNS exfiltration patterns, then export to JSON:
+```powershell
+python main.py -r captures/security_demo.pcap --detect-anomalies --export-json results.json
+```
+
+### 8. Generating Synthetic Test Traffic
+Generate safe, repeatable test vectors including port scans and cleartext test payloads:
+```powershell
+python scripts/generate_traffic.py -o captures/security_demo.pcap
 ```
 
 ---

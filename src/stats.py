@@ -1,8 +1,9 @@
 """Session telemetry and statistical analysis of captured network traffic."""
 
+import json
 import time
 from collections import Counter
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from src.models import PacketRecord
 from src.utils import format_bytes
 
@@ -19,6 +20,17 @@ class CaptureStats:
         self.protocol_counts: Counter = Counter()
         self.top_sources: Counter = Counter()
         self.top_destinations: Counter = Counter()
+        self.alerts: List[Dict[str, Any]] = []
+
+    def record_alert(self, alert_obj: Any) -> None:
+        """Record a detected security anomaly."""
+        self.alerts.append({
+            "timestamp": alert_obj.timestamp.isoformat(),
+            "alert_type": alert_obj.alert_type,
+            "severity": alert_obj.severity,
+            "source_ip": alert_obj.source_ip,
+            "description": alert_obj.description,
+        })
 
     def update(self, record: Optional[PacketRecord], raw_len: int) -> None:
         """Update metrics with a new captured packet."""
@@ -54,4 +66,28 @@ class CaptureStats:
     def bandwidth_summary(self) -> str:
         """Return human-readable total bandwidth captured."""
         return format_bytes(self.total_bytes)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert session metrics into a structured JSON-serializable dictionary."""
+        return {
+            "session_summary": {
+                "start_time": self.start_time,
+                "end_time": self.end_time or time.time(),
+                "duration_seconds": round(self.duration_seconds, 2),
+                "total_packets": self.total_packets,
+                "total_bytes": self.total_bytes,
+                "total_bandwidth": self.bandwidth_summary,
+                "packets_per_second": round(self.packets_per_second, 2),
+                "malformed_packets": self.malformed_packets,
+            },
+            "protocol_distribution": dict(self.protocol_counts),
+            "top_sources": dict(self.top_sources.most_common(10)),
+            "top_destinations": dict(self.top_destinations.most_common(10)),
+            "security_alerts": self.alerts,
+        }
+
+    def export_json(self, file_path: str) -> None:
+        """Export session telemetry and detected anomalies to a JSON file."""
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, indent=2)
 

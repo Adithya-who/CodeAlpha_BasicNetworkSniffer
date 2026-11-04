@@ -7,8 +7,9 @@ from scapy.utils import PcapWriter
 
 from src.models import PacketRecord
 from src.parser import parse_packet
-from src.formatter import print_packet_line
+from src.formatter import print_packet_line, console
 from src.stats import CaptureStats
+from src.heuristics import AnomalyDetector
 
 
 class SnifferEngine:
@@ -21,7 +22,8 @@ class SnifferEngine:
         pcap_path: Optional[str] = None,
         packet_count: int = 0,
         timeout: Optional[int] = None,
-        display_protocol: Optional[str] = None
+        display_protocol: Optional[str] = None,
+        detect_anomalies: bool = False,
     ):
         self.interface = interface
         self.bpf_filter = bpf_filter
@@ -29,6 +31,8 @@ class SnifferEngine:
         self.packet_count = packet_count
         self.timeout = timeout
         self.display_protocol = display_protocol.upper() if display_protocol else None
+        self.detect_anomalies = detect_anomalies
+        self.detector = AnomalyDetector() if detect_anomalies else None
 
         self.stats = CaptureStats()
         self._pcap_writer: Optional[PcapWriter] = None
@@ -42,21 +46,27 @@ class SnifferEngine:
         if self._pcap_writer:
             try:
                 self._pcap_writer.write(raw_packet)
-            except Exception as e:
-                # Log error or continue to avoid dropping the sniffer thread
+            except Exception:
                 pass
 
         # 2. Parse packet into strongly-typed PacketRecord
         record: Optional[PacketRecord] = parse_packet(raw_packet)
 
-        # 3. Update session statistics
+        # 3. Security Heuristic Inspection (Anomaly Detection)
+        if self.detector and record:
+            alert = self.detector.inspect(raw_packet, record)
+            if alert:
+                console.print(alert.format_line())
+                self.stats.record_alert(alert)
+
+        # 4. Update session statistics
         self.stats.update(record, raw_len)
 
-        # 4. Display filtering (application-level)
+        # 5. Display filtering (application-level)
         if self.display_protocol and record and record.protocol != self.display_protocol:
             return
 
-        # 5. Render live terminal output
+        # 6. Render live terminal output
         print_packet_line(self.stats.total_packets, record, raw_len)
 
     def start(self) -> CaptureStats:
@@ -94,6 +104,13 @@ class SnifferEngine:
                 for raw_packet in reader:
                     raw_len = len(raw_packet)
                     record: Optional[PacketRecord] = parse_packet(raw_packet)
+
+                    if self.detector and record:
+                        alert = self.detector.inspect(raw_packet, record)
+                        if alert:
+                            console.print(alert.format_line())
+                            self.stats.record_alert(alert)
+
                     self.stats.update(record, raw_len)
 
                     if self.display_protocol and record and record.protocol != self.display_protocol:

@@ -7,4 +7,6 @@ __pycache__/
 *.cap
 captures/*
 !captures/sample_demo.pcap
+!captures/security_demo.pcap
+results.json
 .env

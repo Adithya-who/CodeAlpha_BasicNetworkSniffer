@@ -75,6 +75,17 @@ Examples:
         help="Application-level display filter (e.g., TCP, UDP, ICMP, DNS)"
     )
     parser.add_argument(
+        "--detect-anomalies",
+        action="store_true",
+        help="Enable heuristic anomaly detection (port scans, cleartext credentials, DNS tunneling)"
+    )
+    parser.add_argument(
+        "--export-json",
+        type=str,
+        default=None,
+        help="Path to export session metrics, protocol counts, and alerts in JSON format"
+    )
+    parser.add_argument(
         "--no-admin-check",
         action="store_true",
         help="Skip administrative privilege verification check"
@@ -129,11 +140,15 @@ def main() -> None:
         console.print(f"[bold cyan][*] OFFLINE PCAP INSPECTION:[/bold cyan] {args.read_pcap}\n")
         engine = SnifferEngine(
             display_protocol=args.protocol,
-            packet_count=args.count
+            packet_count=args.count,
+            detect_anomalies=args.detect_anomalies,
         )
         try:
             stats = engine.read_pcap(args.read_pcap)
             print_summary_report(stats)
+            if args.export_json:
+                stats.export_json(args.export_json)
+                console.print(f"[bold green][+] Session telemetry exported to:[/bold green] {args.export_json}")
         except Exception as e:
             console.print(f"[bold red]Offline Analysis Error:[/bold red] {e}")
         sys.exit(0)
@@ -161,12 +176,16 @@ def main() -> None:
         pcap_path=args.write_pcap,
         packet_count=args.count,
         timeout=args.timeout,
-        display_protocol=args.protocol
+        display_protocol=args.protocol,
+        detect_anomalies=args.detect_anomalies,
     )
 
     try:
         stats = engine.start()
         print_summary_report(stats)
+        if args.export_json:
+            stats.export_json(args.export_json)
+            console.print(f"[bold green][+] Session telemetry exported to:[/bold green] {args.export_json}")
     except PermissionError as e:
         console.print(f"[bold red]Permission Error:[/bold red] {e}")
         console.print("Ensure Npcap is installed and running with admin privileges.")
